@@ -40,6 +40,11 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   String? _errorMessage;
   bool _isDetecting = false;
   int _detectedFaces = 0;
+  String _statusLabel = 'Neutral 🙂';
+
+  bool _blinkInProgress = false;
+  final List<DateTime> _blinkTimestamps = [];
+  double _blinkRatePerMinute = 0;
 
   @override
   void initState() {
@@ -107,14 +112,74 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
       final faces = await _faceDetector.processImage(inputImage);
       if (!mounted) return;
+
+      final primaryFace = faces.isNotEmpty ? faces.first : null;
+      final status = _deriveStatus(primaryFace);
+      _updateBlinkRate(primaryFace);
+
       setState(() {
         _detectedFaces = faces.length;
+        _statusLabel = status;
       });
     } catch (_) {
       // Ignore single frame processing errors and continue streaming.
     } finally {
       _isDetecting = false;
     }
+  }
+
+  void _updateBlinkRate(Face? face) {
+    if (face == null) {
+      _blinkInProgress = false;
+      _blinkTimestamps.clear();
+      _blinkRatePerMinute = 0;
+      return;
+    }
+
+    final left = face.leftEyeOpenProbability;
+    final right = face.rightEyeOpenProbability;
+    if (left == null || right == null) {
+      _blinkInProgress = false;
+      _blinkTimestamps.clear();
+      _blinkRatePerMinute = 0;
+      return;
+    }
+
+    final eyesClosed = left < 0.3 && right < 0.3;
+    if (!_blinkInProgress && eyesClosed) {
+      _blinkInProgress = true;
+    } else if (_blinkInProgress && !eyesClosed) {
+      _blinkInProgress = false;
+      _blinkTimestamps.add(DateTime.now());
+    }
+
+    const windowSeconds = 10;
+    final cutoff = DateTime.now().subtract(const Duration(seconds: windowSeconds));
+    _blinkTimestamps.removeWhere((t) => t.isBefore(cutoff));
+
+    _blinkRatePerMinute = _blinkTimestamps.length * (60 / windowSeconds);
+  }
+
+  String _deriveStatus(Face? face) {
+    if (face == null) return 'Neutral 🙂';
+
+    final left = face.leftEyeOpenProbability;
+    final right = face.rightEyeOpenProbability;
+    if (left != null && right != null && left < 0.3 && right < 0.3) {
+      return 'Tired 😴';
+    }
+
+    final smile = face.smilingProbability;
+    if (smile != null && smile > 0.7) {
+      return 'Happy 😊';
+    }
+
+    const stressBlinkThresholdPerMinute = 20.0; // simple initial threshold
+    if (_blinkRatePerMinute > stressBlinkThresholdPerMinute) {
+      return 'Stressed 😵';
+    }
+
+    return 'Neutral 🙂';
   }
 
   Uint8List _concatenatePlanes(List<Plane> planes) {
@@ -180,7 +245,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                   vertical: 8,
                 ),
                 child: Text(
-                  'Faces detected: $_detectedFaces',
+                  'Faces: $_detectedFaces\nStatus: $_statusLabel',
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
