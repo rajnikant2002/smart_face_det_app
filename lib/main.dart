@@ -46,7 +46,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   String _lightingLabel = 'Good Lighting 💡';
   String _suggestion = 'You\'re doing great 👍';
   double _brightnessValue = 0;
-  final DateTime _sessionStart = DateTime.now();
+  int _usageMinutes = 0;
+  Timer? _usageTimer;
 
   bool _blinkInProgress = false;
   final List<DateTime> _blinkTimestamps = [];
@@ -55,7 +56,17 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   @override
   void initState() {
     super.initState();
+    _startUsageTimer();
     _initializeCamera();
+  }
+
+  void _startUsageTimer() {
+    _usageTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        _usageMinutes++;
+      });
+    });
   }
 
   Future<void> _initializeCamera() async {
@@ -126,8 +137,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       final brightness = _calculateBrightness(image);
       final lighting = _deriveLighting(brightness);
       final lightingLabel = _formatLightingLabel(lighting);
-      final usageMinutes = _getUsageMinutes();
-      final suggestion = getSuggestion(state, lighting, usageMinutes);
+      final suggestion = getSuggestion(state, lighting, _usageMinutes);
 
       setState(() {
         _detectedFaces = faces.length;
@@ -249,10 +259,6 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     }
   }
 
-  int _getUsageMinutes() {
-    return DateTime.now().difference(_sessionStart).inMinutes;
-  }
-
   Uint8List _concatenatePlanes(List<Plane> planes) {
     final allBytes = WriteBuffer();
     for (final plane in planes) {
@@ -263,6 +269,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
   @override
   void dispose() {
+    _usageTimer?.cancel();
     final controller = _controller;
     if (controller != null && controller.value.isStreamingImages) {
       unawaited(controller.stopImageStream());
@@ -322,7 +329,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                   'Status: $_statusLabel\n'
                   'Lighting: $_lightingLabel\n'
                   'Brightness: ${_brightnessValue.toStringAsFixed(0)}\n'
-                  'Usage: ${_getUsageMinutes()} mins',
+                  'Usage: $_usageMinutes mins',
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
