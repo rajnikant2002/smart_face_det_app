@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:smart_face_det_app/features/suggestion/suggestion_engine.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,8 +43,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   bool _isDetecting = false;
   int _detectedFaces = 0;
   String _statusLabel = 'Neutral 🙂';
-  String _lightingLabel = 'Normal ☀️';
+  String _lightingLabel = 'Good Lighting 💡';
+  String _suggestion = 'You\'re doing great 👍';
   double _brightnessValue = 0;
+  final DateTime _sessionStart = DateTime.now();
 
   bool _blinkInProgress = false;
   final List<DateTime> _blinkTimestamps = [];
@@ -116,16 +120,21 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       if (!mounted) return;
 
       final primaryFace = faces.isNotEmpty ? faces.first : null;
-      final status = _deriveStatus(primaryFace);
       _updateBlinkRate(primaryFace);
+      final state = _deriveState(primaryFace);
+      final status = _formatStateLabel(state);
       final brightness = _calculateBrightness(image);
       final lighting = _deriveLighting(brightness);
+      final lightingLabel = _formatLightingLabel(lighting);
+      final usageMinutes = _getUsageMinutes();
+      final suggestion = getSuggestion(state, lighting, usageMinutes);
 
       setState(() {
         _detectedFaces = faces.length;
         _statusLabel = status;
         _brightnessValue = brightness;
-        _lightingLabel = lighting;
+        _lightingLabel = lightingLabel;
+        _suggestion = suggestion;
       });
     } catch (_) {
       // Ignore single frame processing errors and continue streaming.
@@ -166,26 +175,26 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     _blinkRatePerMinute = _blinkTimestamps.length * (60 / windowSeconds);
   }
 
-  String _deriveStatus(Face? face) {
-    if (face == null) return 'Neutral 🙂';
+  String _deriveState(Face? face) {
+    if (face == null) return 'Neutral';
 
     final left = face.leftEyeOpenProbability;
     final right = face.rightEyeOpenProbability;
     if (left != null && right != null && left < 0.3 && right < 0.3) {
-      return 'Tired 😴';
+      return 'Tired';
     }
 
     final smile = face.smilingProbability;
     if (smile != null && smile > 0.7) {
-      return 'Happy 😊';
+      return 'Happy';
     }
 
     const stressBlinkThresholdPerMinute = 20.0; // simple initial threshold
     if (_blinkRatePerMinute > stressBlinkThresholdPerMinute) {
-      return 'Stressed 😵';
+      return 'Stressed';
     }
 
-    return 'Neutral 🙂';
+    return 'Neutral';
   }
 
   double _calculateBrightness(CameraImage image) {
@@ -208,12 +217,40 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
   String _deriveLighting(double brightness) {
     if (brightness < 50) {
-      return 'Too Dim 🌙';
+      return 'Dark';
     }
     if (brightness > 200) {
-      return 'Too Bright ☀️';
+      return 'Too Bright';
     }
-    return 'Good Lighting 💡';
+    return 'Good';
+  }
+
+  String _formatStateLabel(String state) {
+    switch (state) {
+      case 'Tired':
+        return 'Tired 😴';
+      case 'Stressed':
+        return 'Stressed 😵';
+      case 'Happy':
+        return 'Happy 😊';
+      default:
+        return 'Neutral 🙂';
+    }
+  }
+
+  String _formatLightingLabel(String lighting) {
+    switch (lighting) {
+      case 'Dark':
+        return 'Too Dim 🌙';
+      case 'Too Bright':
+        return 'Too Bright ☀️';
+      default:
+        return 'Good Lighting 💡';
+    }
+  }
+
+  int _getUsageMinutes() {
+    return DateTime.now().difference(_sessionStart).inMinutes;
   }
 
   Uint8List _concatenatePlanes(List<Plane> planes) {
@@ -225,13 +262,15 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   }
 
   @override
-  Future<void> dispose() async {
+  void dispose() {
     final controller = _controller;
     if (controller != null && controller.value.isStreamingImages) {
-      await controller.stopImageStream();
+      unawaited(controller.stopImageStream());
     }
-    await controller?.dispose();
-    await _faceDetector.close();
+    if (controller != null) {
+      unawaited(controller.dispose());
+    }
+    unawaited(_faceDetector.close());
     super.dispose();
   }
 
@@ -282,8 +321,31 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                   'Faces: $_detectedFaces\n'
                   'Status: $_statusLabel\n'
                   'Lighting: $_lightingLabel\n'
-                  'Brightness: ${_brightnessValue.toStringAsFixed(0)}',
+                  'Brightness: ${_brightnessValue.toStringAsFixed(0)}\n'
+                  'Usage: ${_getUsageMinutes()} mins',
                   style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 36,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.62),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Text(
+                  '💡 Suggestion:\n$_suggestion',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
