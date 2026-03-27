@@ -1,17 +1,65 @@
-# smart_face_det_app
+# Smart Face Detection App
 
-A new Flutter project.
+AI-powered Flutter app that uses the front camera to detect face state, lighting conditions, usage patterns, and give real-time wellness suggestions with basic gamification.
 
-## Getting Started
+## Features
 
-This project is a starting point for a Flutter application.
+- Front camera live preview (full screen, aspect-ratio safe)
+- Real-time face detection with ML Kit
+- State detection:
+  - Tired (both eyes mostly closed)
+  - Stressed (high blink rate, basic logic)
+  - Happy (high smile probability)
+  - Neutral (default)
+- Lighting detection:
+  - Too Dim
+  - Too Bright
+  - Good Lighting
+- Suggestion engine:
+  - Context-aware suggestions from state, lighting, and usage time
+  - 30-minute light reminder
+  - 2-hour strong break suggestion
+- Gamification:
+  - Points and streak rewards for healthy usage behavior
 
-A few resources to get you started if this is your first Flutter project:
+## Project Structure
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```text
+lib/
+├── features/
+│   ├── camera/
+│   ├── face_detection/
+│   ├── suggestion/
+│   │   └── suggestion_engine.dart
+│   ├── tracking/
+│   └── gamification/
+├── ui/
+└── main.dart
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Dependencies
+
+- `camera: ^0.10.5`
+- `google_mlkit_face_detection: ^0.10.0`
+- `permission_handler: ^11.0.0`
+
+## Run Locally
+
+1. Install Flutter SDK and device/emulator setup.
+2. Get packages:
+   - `flutter pub get`
+3. Run app:
+   - `flutter run`
+
+## Current UI Layout
+
+- Camera preview with face overlay area
+- Status and lighting info row
+- Suggestion card
+- Streak and points row
+
+## Notes
+
+- Uses front camera by default.
+- Face and lighting logic are intentionally simple and can be tuned per device.
+- Permission handling package is added and ready for explicit camera permission flow.
