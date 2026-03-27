@@ -41,6 +41,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   bool _isDetecting = false;
   int _detectedFaces = 0;
   String _statusLabel = 'Neutral 🙂';
+  String _lightingLabel = 'Normal ☀️';
+  double _brightnessValue = 0;
 
   bool _blinkInProgress = false;
   final List<DateTime> _blinkTimestamps = [];
@@ -116,10 +118,14 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       final primaryFace = faces.isNotEmpty ? faces.first : null;
       final status = _deriveStatus(primaryFace);
       _updateBlinkRate(primaryFace);
+      final brightness = _calculateBrightness(image);
+      final lighting = _deriveLighting(brightness);
 
       setState(() {
         _detectedFaces = faces.length;
         _statusLabel = status;
+        _brightnessValue = brightness;
+        _lightingLabel = lighting;
       });
     } catch (_) {
       // Ignore single frame processing errors and continue streaming.
@@ -180,6 +186,34 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     }
 
     return 'Neutral 🙂';
+  }
+
+  double _calculateBrightness(CameraImage image) {
+    // For YUV camera frames, first plane is luminance (Y): 0-255.
+    if (image.planes.isEmpty) return 0;
+    final bytes = image.planes.first.bytes;
+    if (bytes.isEmpty) return 0;
+
+    const step = 10; // sample every 10th byte for speed
+    int sum = 0;
+    int count = 0;
+
+    for (int i = 0; i < bytes.length; i += step) {
+      sum += bytes[i];
+      count++;
+    }
+
+    return count == 0 ? 0 : sum / count;
+  }
+
+  String _deriveLighting(double brightness) {
+    if (brightness < 50) {
+      return 'Too Dim 🌙';
+    }
+    if (brightness > 200) {
+      return 'Too Bright ☀️';
+    }
+    return 'Good Lighting 💡';
   }
 
   Uint8List _concatenatePlanes(List<Plane> planes) {
@@ -245,7 +279,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                   vertical: 8,
                 ),
                 child: Text(
-                  'Faces: $_detectedFaces\nStatus: $_statusLabel',
+                  'Faces: $_detectedFaces\n'
+                  'Status: $_statusLabel\n'
+                  'Lighting: $_lightingLabel\n'
+                  'Brightness: ${_brightnessValue.toStringAsFixed(0)}',
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
