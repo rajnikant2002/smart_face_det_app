@@ -48,6 +48,10 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
   double _brightnessValue = 0;
   int _usageMinutes = 0;
   Timer? _usageTimer;
+  int _points = 0;
+  int _streak = 0;
+  String _currentState = 'Neutral';
+  String _currentLighting = 'Good';
 
   bool _blinkInProgress = false;
   final List<DateTime> _blinkTimestamps = [];
@@ -65,8 +69,21 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
       if (!mounted) return;
       setState(() {
         _usageMinutes++;
+        if (_shouldRewardUser()) {
+          rewardUser();
+        }
       });
     });
+  }
+
+  void rewardUser() {
+    _points += 10;
+    _streak += 1;
+  }
+
+  bool _shouldRewardUser() {
+    return _currentLighting == 'Good' &&
+        (_currentState == 'Neutral' || _currentState == 'Happy');
   }
 
   Future<void> _initializeCamera() async {
@@ -141,6 +158,8 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
 
       setState(() {
         _detectedFaces = faces.length;
+        _currentState = state;
+        _currentLighting = lighting;
         _statusLabel = status;
         _brightnessValue = brightness;
         _lightingLabel = lightingLabel;
@@ -267,6 +286,26 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     return allBytes.done().buffer.asUint8List();
   }
 
+  Widget _buildCameraView(CameraController controller) {
+    final screenSize = MediaQuery.of(context).size;
+    final previewSize = controller.value.previewSize;
+
+    if (previewSize == null) {
+      return CameraPreview(controller);
+    }
+
+    final previewAspectRatio = previewSize.height / previewSize.width;
+    final screenAspectRatio = screenSize.width / screenSize.height;
+    final scale = previewAspectRatio / screenAspectRatio;
+
+    return Transform.scale(
+      scale: scale < 1 ? 1 / scale : scale,
+      child: Center(
+        child: CameraPreview(controller),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _usageTimer?.cancel();
@@ -308,9 +347,7 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          SizedBox.expand(
-            child: CameraPreview(controller),
-          ),
+          SizedBox.expand(child: _buildCameraView(controller)),
           Positioned(
             top: 48,
             left: 16,
@@ -329,7 +366,9 @@ class _CameraPreviewScreenState extends State<CameraPreviewScreen> {
                   'Status: $_statusLabel\n'
                   'Lighting: $_lightingLabel\n'
                   'Brightness: ${_brightnessValue.toStringAsFixed(0)}\n'
-                  'Usage: $_usageMinutes mins',
+                  'Usage: $_usageMinutes mins\n'
+                  '🔥 Streak: $_streak days\n'
+                  '⭐ Points: $_points',
                   style: const TextStyle(color: Colors.white),
                 ),
               ),
