@@ -28,12 +28,21 @@ AI-powered Flutter app that uses the front camera to detect face state, lighting
 lib/
 ├── features/
 │   ├── camera/
+│   │   └── camera_aspect_preview.dart
 │   ├── face_detection/
+│   │   ├── blink_tracker.dart
+│   │   ├── camera_image_bytes.dart
+│   │   ├── face_labels.dart
+│   │   ├── input_image_builder.dart
+│   │   └── mlkit_face_detector.dart
 │   ├── suggestion/
 │   │   └── suggestion_engine.dart
 │   ├── tracking/
+│   │   └── usage_tracker.dart
 │   └── gamification/
+│       └── gamification.dart
 ├── ui/
+│   └── home_screen.dart
 └── main.dart
 ```
 
